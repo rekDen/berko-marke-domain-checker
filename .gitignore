@@ -1,0 +1,15 @@
+# Zugangsdaten
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Betriebssystem und Editoren
+.DS_Store
+.idea/
+.vscode/
+
+# Lokale Claude-Einstellungen
+.claude/settings.local.json

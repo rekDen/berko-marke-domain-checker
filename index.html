@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Berko Checker — Markensuche Europa</title>
+<style>
+  :root {
+    --bg: #0f1419; --card: #1a2029; --line: #2a3340;
+    --txt: #e6edf3; --muted: #8b98a5; --accent: #3b82f6; --accent2: #1d4ed8;
+    --ok: #22c55e; --warn: #f59e0b; --err: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--txt); line-height: 1.5;
+  }
+  header {
+    padding: 24px 32px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 16px;
+  }
+  header h1 { margin: 0; font-size: 22px; }
+  header .sub { color: var(--muted); font-size: 14px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 32px; }
+  .search-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px; margin-bottom: 24px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  input, select {
+    background: var(--bg); border: 1px solid var(--line); color: var(--txt);
+    padding: 10px 12px; border-radius: 8px; font-size: 14px; min-width: 120px;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  #q { min-width: 280px; }
+  button {
+    background: var(--accent); color: #fff; border: none; padding: 11px 22px;
+    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button:hover { background: var(--accent2); }
+  button:disabled { opacity: .5; cursor: default; }
+  .status-line { margin: 16px 0; color: var(--muted); font-size: 14px; min-height: 20px; }
+  .status-line.error { color: var(--err); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  tr.tm-row:hover { background: rgba(255,255,255,.03); }
+  .name { font-weight: 600; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px;
+    background: var(--line); color: var(--txt);
+  }
+  .badge.REGISTERED { background: rgba(34,197,94,.15); color: var(--ok); }
+  .badge.EXPIRED, .badge.WITHDRAWN, .badge.REFUSED, .badge.CANCELLED,
+  .badge.SURRENDERED, .badge.REMOVED_FROM_REGISTER { background: rgba(239,68,68,.15); color: var(--err); }
+  .badge.RECEIVED, .badge.UNDER_EXAMINATION, .badge.APPLICATION_PUBLISHED,
+  .badge.REGISTRATION_PENDING, .badge.OPPOSITION_PENDING,
+  .badge.START_OF_OPPOSITION_PERIOD { background: rgba(245,158,11,.15); color: var(--warn); }
+  .classes { color: var(--muted); font-size: 13px; }
+  .pager { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 20px; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .empty { text-align: center; color: var(--muted); padding: 40px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔎 Berko Checker</h1>
+  <span class="sub">Markensuche in Europa · EUIPO Trademark Search</span>
+</header>
+<main>
+  <div class="search-card">
+    <div class="row">
+      <div class="field" style="flex:1">
+        <label for="q">Markenname</label>
+        <input id="q" type="text" placeholder="z. B. Berko" autofocus>
+      </div>
+      <div class="field">
+        <label for="niceClasses">Nizza-Klassen</label>
+        <input id="niceClasses" type="text" placeholder="z. B. 25,35" style="min-width:140px">
+      </div>
+      <div class="field">
+        <label for="status">Status</label>
+        <select id="status">
+          <option value="">Alle</option>
+          <option value="REGISTERED">Registriert</option>
+          <option value="RECEIVED">Eingegangen</option>
+          <option value="UNDER_EXAMINATION">In Prüfung</option>
+          <option value="APPLICATION_PUBLISHED">Veröffentlicht</option>
+          <option value="OPPOSITION_PENDING">Widerspruch anhängig</option>
+          <option value="EXPIRED">Abgelaufen</option>
+          <option value="WITHDRAWN">Zurückgezogen</option>
+          <option value="REFUSED">Abgelehnt</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="markFeature">Art</label>
+        <select id="markFeature">
+          <option value="">Alle</option>
+          <option value="WORD">Wortmarke</option>
+          <option value="FIGURATIVE">Bildmarke</option>
+          <option value="SHAPE_3D">3D-Form</option>
+          <option value="COLOUR">Farbe</option>
+          <option value="SOUND">Klang</option>
+          <option value="POSITION">Position</option>
+          <option value="PATTERN">Muster</option>
+          <option value="MOTION">Bewegung</option>
+          <option value="MULTIMEDIA">Multimedia</option>
+          <option value="HOLOGRAM">Hologramm</option>
+          <option value="OLFACTORY">Geruch</option>
+          <option value="OTHER">Sonstige</option>
+        </select>
+      </div>
+      <div class="field">
+        <button id="searchBtn">Suchen</button>
+      </div>
+    </div>
+    <div class="hint">Tipp: Die Suche im Markennamen ist eine Wildcard-Suche (z. B. „Berko“ findet auch „Berkoff“).</div>
+  </div>
+
+  <div class="status-line" id="statusLine"></div>
+  <div id="results"></div>
+  <div class="pager" id="pager" style="display:none">
+    <button id="prevBtn">‹ Zurück</button>
+    <span id="pageInfo"></span>
+    <button id="nextBtn">Weiter ›</button>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let currentPage = 0;
+const pageSize = 25;
+
+// Statuswerte laut EUIPO-API-Spezifikation.
+const STATUS_LABEL = {
+  RECEIVED: "Eingegangen", UNDER_EXAMINATION: "In Prüfung",
+  APPLICATION_PUBLISHED: "Veröffentlicht", REGISTRATION_PENDING: "Eintragung anhängig",
+  REGISTERED: "Registriert", WITHDRAWN: "Zurückgezogen", REFUSED: "Abgelehnt",
+  OPPOSITION_PENDING: "Widerspruch anhängig", APPEALED: "Beschwerde",
+  CANCELLATION_PENDING: "Löschung anhängig", CANCELLED: "Gelöscht",
+  SURRENDERED: "Verzichtet", EXPIRED: "Abgelaufen", APPEALABLE: "Beschwerdefähig",
+  START_OF_OPPOSITION_PERIOD: "Widerspruchsfrist läuft",
+  ACCEPTANCE_PENDING: "Annahme anhängig", ACCEPTED: "Angenommen",
+  REMOVED_FROM_REGISTER: "Aus Register entfernt",
+};
+const FEATURE_LABEL = {
+  WORD: "Wortmarke", FIGURATIVE: "Bildmarke", SHAPE_3D: "3D-Form",
+  COLOUR: "Farbe", SOUND: "Klang", HOLOGRAM: "Hologramm",
+  POSITION: "Position", PATTERN: "Muster", MOTION: "Bewegung",
+  MULTIMEDIA: "Multimedia", OLFACTORY: "Geruch", OTHER: "Sonstige",
+};
+
+function setStatus(msg, isError) {
+  const el = $("statusLine");
+  el.textContent = msg;
+  el.className = "status-line" + (isError ? " error" : "");
+}
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+async function doSearch(page) {
+  currentPage = page || 0;
+  const q = $("q").value.trim();
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  const nice = $("niceClasses").value.replace(/\s/g, "");
+  if (nice) params.set("niceClasses", nice);
+  if ($("status").value) params.set("status", $("status").value);
+  if ($("markFeature").value) params.set("markFeature", $("markFeature").value);
+  params.set("page", currentPage);
+  params.set("size", pageSize);
+
+  $("searchBtn").disabled = true;
+  setStatus("Suche läuft …", false);
+  $("results").innerHTML = "";
+  $("pager").style.display = "none";
+
+  try {
+    const resp = await fetch("/api/search?" + params.toString());
+    const data = await resp.json();
+    if (!resp.ok) {
+      const detail = data.detail || data.error || data.title || ("HTTP " + resp.status);
+      setStatus("Fehler: " + detail, true);
+      if (resp.status === 403) {
+        setStatus("Fehler 403: Der API-Zugang ist für das Produkt „Trademark search“ noch nicht freigeschaltet. "
+          + "Bitte die App im EUIPO Developer Portal für diese API abonnieren.", true);
+      }
+      return;
+    }
+    renderResults(data);
+  } catch (e) {
+    setStatus("Netzwerkfehler: " + e.message, true);
+  } finally {
+    $("searchBtn").disabled = false;
+  }
+}
+
+function renderResults(data) {
+  const items = data.trademarks || [];
+  const total = data.totalElements || 0;
+  const totalPages = data.totalPages || 0;
+
+  if (items.length === 0) {
+    setStatus("", false);
+    $("results").innerHTML = '<div class="empty">Keine Treffer gefunden.</div>';
+    return;
+  }
+
+  setStatus(`${total} Treffer · Seite ${currentPage + 1} von ${totalPages}`, false);
+
+  let html = '<table><thead><tr>'
+    + '<th>Marke</th><th>Anmeldenr.</th><th>Status</th><th>Art</th>'
+    + '<th>Klassen</th><th>Anmeldung</th></tr></thead><tbody>';
+
+  for (const tm of items) {
+    const name = (tm.wordMarkSpecification && tm.wordMarkSpecification.verbalElement) || "—";
+    const st = tm.status || "";
+    const feat = tm.markFeature || "";
+    const classes = (tm.niceClasses || []).join(", ");
+    html += '<tr class="tm-row">'
+      + `<td class="name">${esc(name)}</td>`
+      + `<td>${esc(tm.applicationNumber || "")}</td>`
+      + `<td><span class="badge ${esc(st)}">${esc(STATUS_LABEL[st] || st)}</span></td>`
+      + `<td>${esc(FEATURE_LABEL[feat] || feat)}</td>`
+      + `<td class="classes">${esc(classes)}</td>`
+      + `<td>${esc(tm.applicationDate || "")}</td>`
+      + '</tr>';
+  }
+  html += '</tbody></table>';
+  $("results").innerHTML = html;
+
+  $("pager").style.display = totalPages > 1 ? "flex" : "none";
+  $("pageInfo").textContent = `Seite ${currentPage + 1} / ${totalPages}`;
+  $("prevBtn").disabled = currentPage <= 0;
+  $("nextBtn").disabled = currentPage >= totalPages - 1;
+}
+
+$("searchBtn").addEventListener("click", () => doSearch(0));
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(0); });
+$("niceClasses").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(0); });
+$("prevBtn").addEventListener("click", () => doSearch(currentPage - 1));
+$("nextBtn").addEventListener("click", () => doSearch(currentPage + 1));
+</script>
+</body>
+</html>

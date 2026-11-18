@@ -1,0 +1,5 @@
+{
+  "token_url": "https://euipo.europa.eu/cas-server-webapp/oidc/accessToken",
+  "api_base": "https://api.euipo.europa.eu/trademark-search",
+  "scope": "uid"
+}
