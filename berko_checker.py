@@ -10,6 +10,7 @@ Aufruf:
     python3 berko_checker.py            # Server auf http://localhost:8000
     python3 berko_checker.py --port 9000
     python3 berko_checker.py --cli "Berko"   # einmalige Suche im Terminal
+    python3 berko_checker.py --cli "Berko AI" --domain berko-ai
 """
 
 import argparse
@@ -22,6 +23,8 @@ import urllib.parse
 import urllib.request
 import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+import domains
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
@@ -293,6 +296,20 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(code, data)
             return
 
+        if path == "/api/domains":
+            qs = urllib.parse.parse_qs(parsed.query)
+            name = (qs.get("name") or [""])[0].strip()
+            try:
+                data = domains.check_all(name)
+            except domains.DomainInputError as exc:
+                self._send_json(400, {"error": str(exc)})
+                return
+            except Exception as exc:  # noqa: BLE001
+                self._send_json(502, {"error": str(exc)})
+                return
+            self._send_json(200, data)
+            return
+
         if path.startswith("/api/trademark/"):
             app_no = path.rsplit("/", 1)[-1]
             try:
@@ -322,27 +339,57 @@ def run_server(client, port):
         server.shutdown()
 
 
-def run_cli(client, term):
+DOMAIN_STATUS_LABEL = {
+    domains.AVAILABLE: "frei",
+    domains.REGISTERED: "vergeben",
+    domains.UNKNOWN: "unbekannt",
+}
+
+
+def run_cli(client, term, domain_name=None):
+    """Markensuche und Domain-Check. Ein Fehler bei der Markensuche
+    verhindert den Domain-Check nicht."""
+    exit_code = 0
+
+    print("== Marken (EUIPO) ==")
     try:
         code, data = client.search(query=term, size=25)
     except InputError as exc:
         print(f"Fehler: {exc}")
-        sys.exit(2)
-    if code != 200:
+        code, data, exit_code = None, None, 2
+    except OSError as exc:
+        print(f"Fehler: EUIPO nicht erreichbar ({exc})")
+        code, data, exit_code = None, None, 1
+    if code is not None and code != 200:
         print(f"Fehler {code}: {json.dumps(data, ensure_ascii=False, indent=2)}")
-        sys.exit(1)
-    total = data.get("totalElements", 0)
-    print(f"Treffer gesamt: {total}\n")
-    for tm in data.get("trademarks", []):
-        name = (tm.get("wordMarkSpecification") or {}).get("verbalElement", "—")
-        print(f"  {tm.get('applicationNumber'):<12} {tm.get('status', ''):<14} "
-              f"{tm.get('markFeature', ''):<12} {name}")
+        exit_code = 1
+    elif code == 200:
+        print(f"Treffer gesamt: {data.get('totalElements', 0)}\n")
+        for tm in data.get("trademarks", []):
+            name = (tm.get("wordMarkSpecification") or {}).get("verbalElement", "—")
+            print(f"  {tm.get('applicationNumber'):<12} {tm.get('status', ''):<14} "
+                  f"{tm.get('markFeature', ''):<12} {name}")
+
+    print("\n== Domains ==")
+    try:
+        result = domains.check_all(domain_name or term)
+    except domains.DomainInputError as exc:
+        print(f"Fehler: {exc}")
+        sys.exit(exit_code or 2)
+    for r in result["results"]:
+        detail = f"  ({r['detail']})" if r["status"] == domains.UNKNOWN and r["detail"] else ""
+        print(f"  {r['domain']:<32} {DOMAIN_STATUS_LABEL[r['status']]}{detail}")
+
+    if exit_code:
+        sys.exit(exit_code)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Berko Checker — EUIPO Markensuche")
     parser.add_argument("--port", type=int, default=8000, help="Port des Webservers")
     parser.add_argument("--cli", metavar="BEGRIFF", help="Einmalige Suche im Terminal")
+    parser.add_argument("--domain", metavar="NAME",
+                        help="Abweichender Domainname für den Domain-Check (nur mit --cli)")
     args = parser.parse_args()
 
     try:
@@ -353,7 +400,7 @@ def main():
     client = EuipoClient(config)
 
     if args.cli:
-        run_cli(client, args.cli)
+        run_cli(client, args.cli, args.domain)
     else:
         run_server(client, args.port)
 

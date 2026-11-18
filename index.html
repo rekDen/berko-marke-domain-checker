@@ -63,6 +63,26 @@
   .hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
   .empty { text-align: center; color: var(--muted); padding: 40px; }
   a { color: var(--accent); }
+  h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600;
+       text-transform: uppercase; letter-spacing: .04em; }
+  .domain-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 20px; margin-bottom: 24px;
+  }
+  .domain-card .label-info { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .domain-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .domain {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px;
+  }
+  .domain .dn { font-weight: 600; overflow-wrap: anywhere; }
+  .domain.available { border-color: rgba(34,197,94,.4); }
+  .domain.registered { opacity: .75; }
+  .dbadge { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .dbadge.available { background: rgba(34,197,94,.15); color: var(--ok); }
+  .dbadge.registered { background: rgba(239,68,68,.15); color: var(--err); }
+  .dbadge.unknown, .dbadge.pending { background: var(--line); color: var(--muted); }
+  .section-title { margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -114,12 +134,24 @@
         </select>
       </div>
       <div class="field">
+        <label for="domainName">Domainname (optional)</label>
+        <input id="domainName" type="text" placeholder="aus Markenname" style="min-width:160px">
+      </div>
+      <div class="field">
         <button id="searchBtn">Suchen</button>
       </div>
     </div>
-    <div class="hint">Tipp: Die Suche im Markennamen ist eine Wildcard-Suche (z. B. „Berko“ findet auch „Berkoff“).</div>
+    <div class="hint">Tipp: Die Suche im Markennamen ist eine Wildcard-Suche (z. B. „Berko“ findet auch „Berkoff“).
+      Für den Domain-Check wird der Markenname ohne Leer- und Sonderzeichen verwendet („Berko AI“ → berkoai), außer du gibst einen eigenen Domainnamen an.</div>
   </div>
 
+  <div class="domain-card" id="domainCard" style="display:none">
+    <h2>Domains</h2>
+    <div class="label-info" id="domainInfo"></div>
+    <div class="domain-grid" id="domainGrid"></div>
+  </div>
+
+  <h2 class="section-title" id="tmTitle" style="display:none">Marken (EUIPO)</h2>
   <div class="status-line" id="statusLine"></div>
   <div id="results"></div>
   <div class="pager" id="pager" style="display:none">
@@ -241,9 +273,58 @@ function renderResults(data) {
   $("nextBtn").disabled = currentPage >= totalPages - 1;
 }
 
-$("searchBtn").addEventListener("click", () => doSearch(0));
-$("q").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(0); });
-$("niceClasses").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(0); });
+// --- Domain-Check -----------------------------------------------------------
+const DOMAIN_TLDS = ["de", "com", "ai", "io", "at", "it", "pl", "eu", "co.uk", "org"];
+const DOMAIN_LABEL = { available: "frei", registered: "vergeben", unknown: "unbekannt", pending: "prüfe …" };
+let domainRequest = 0;
+
+function renderDomains(items) {
+  $("domainGrid").innerHTML = items.map((d) => {
+    const title = d.status === "unknown" && d.detail ? ` title="${esc(d.detail)}"` : "";
+    return `<div class="domain ${esc(d.status)}"${title}>`
+      + `<span class="dn">${esc(d.domain)}</span>`
+      + `<span class="dbadge ${esc(d.status)}">${esc(DOMAIN_LABEL[d.status] || d.status)}</span></div>`;
+  }).join("");
+}
+
+async function checkDomains() {
+  const name = $("domainName").value.trim() || $("q").value.trim();
+  if (!name) { $("domainCard").style.display = "none"; return; }
+  const req = ++domainRequest;
+  $("domainCard").style.display = "";
+  $("domainInfo").textContent = "Prüfe Verfügbarkeit …";
+  const guess = name.toLowerCase().replace(/[^\p{L}\p{N}-]/gu, "");
+  renderDomains(DOMAIN_TLDS.map((t) => ({ domain: `${guess}.${t}`, status: "pending" })));
+  try {
+    const resp = await fetch("/api/domains?" + new URLSearchParams({ name }));
+    const data = await resp.json();
+    if (req !== domainRequest) return; // inzwischen neue Suche gestartet
+    if (!resp.ok) {
+      $("domainInfo").textContent = "Fehler: " + (data.error || ("HTTP " + resp.status));
+      $("domainGrid").innerHTML = "";
+      return;
+    }
+    const free = data.results.filter((d) => d.status === "available").length;
+    $("domainInfo").textContent = `Name „${data.label}“ · ${free} von ${data.results.length} Endungen frei`
+      + " · „frei“ = nicht registriert; Premium-Preise oder Reservierungen zeigt erst der Registrar.";
+    renderDomains(data.results);
+  } catch (e) {
+    if (req !== domainRequest) return;
+    $("domainInfo").textContent = "Netzwerkfehler beim Domain-Check: " + e.message;
+    $("domainGrid").innerHTML = "";
+  }
+}
+
+function startSearch() {
+  $("tmTitle").style.display = "";
+  checkDomains();
+  doSearch(0);
+}
+
+$("searchBtn").addEventListener("click", startSearch);
+for (const id of ["q", "niceClasses", "domainName"]) {
+  $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") startSearch(); });
+}
 $("prevBtn").addEventListener("click", () => doSearch(currentPage - 1));
 $("nextBtn").addEventListener("click", () => doSearch(currentPage + 1));
 </script>

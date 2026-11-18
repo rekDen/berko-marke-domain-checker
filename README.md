@@ -1,6 +1,7 @@
 # Berko Checker
 
-Tool zur Markensuche in Europa über die **EUIPO Trademark Search API**.
+Tool zur Markensuche in Europa über die **EUIPO Trademark Search API**, mit
+gleichzeitigem **Domain-Check** für die gängigsten Endungen.
 Eigenständig, ohne externe Abhängigkeiten — nur Python 3 (Standardbibliothek).
 
 ## Einrichten
@@ -27,7 +28,14 @@ Optionen:
 
 ```bash
 python3 berko_checker.py --port 9000     # anderer Port
-python3 berko_checker.py --cli "Berko"   # einmalige Suche im Terminal
+python3 berko_checker.py --cli "Berko"   # einmalige Suche im Terminal (Marken + Domains)
+python3 berko_checker.py --cli "Berko AI" --domain berko-ai   # eigener Domainname
+```
+
+Tests (ohne Netzwerk):
+
+```bash
+python3 -m unittest discover tests
 ```
 
 ## Funktionen
@@ -37,12 +45,35 @@ python3 berko_checker.py --cli "Berko"   # einmalige Suche im Terminal
 - Eingaben werden gegen die erlaubten Werte der API geprüft; Fehler kommen als verständliche Meldung (HTTP 400)
 - Ergebnisliste mit Anmeldenummer, Status, Art, Klassen und Anmeldedatum
 - Blättern durch Trefferseiten
+- Domain-Check bei jeder Suche (siehe unten)
+
+## Domain-Check
+
+Bei jeder Suche prüft das Tool parallel, ob der Name unter diesen Endungen noch frei ist:
+`.de`, `.com`, `.ai`, `.io`, `.at`, `.it`, `.pl`, `.eu`, `.co.uk`, `.org`.
+
+- **Name:** Der Markenname wird kleingeschrieben, Leer- und Sonderzeichen fallen weg
+  („Berko AI“ → `berkoai`). Umlaute werden als IDN kodiert („Müller“ → `xn--mller-kva`).
+  Über das Feld **Domainname (optional)** bzw. `--domain` lässt sich ein anderer Name prüfen, z. B. `berko-ai`.
+- **Quellen:** Das Tool fragt direkt bei den Registries an, ohne Drittanbieter:
+  - RDAP für `.com`, `.ai`, `.org`, `.pl`, `.co.uk` (HTTP 404 = frei)
+  - WHOIS für `.de`, `.io`, `.at`, `.it`, `.eu`, die kein öffentliches RDAP anbieten
+- **Ergebnis:** *frei* = nicht registriert, *vergeben* = registriert, *unbekannt* = Registry nicht
+  erreichbar oder Rate-Limit (Details im Tooltip).
+- Ergebnisse werden 10 Minuten zwischengespeichert, um die Rate-Limits der WHOIS-Server zu schonen.
+
+„Frei“ heißt nur, dass die Domain nicht registriert ist. Ob sie zum normalen Preis bestellbar ist
+(Premium-Domain, Reservierung, Sperrfrist nach Löschung), zeigt erst der Registrar.
+
+Hinweis: Für die Prüfung geht der Domainname an die jeweilige Registry.
 
 ## Aufbau
 
 | Datei | Zweck |
 |-------|-------|
 | `berko_checker.py` | Lokaler Webserver + OAuth2-Token-Handling + API-Aufrufe |
+| `domains.py` | Domain-Check über RDAP und WHOIS |
+| `tests/` | Unit-Tests (`python3 -m unittest discover tests`) |
 | `index.html` | Suchoberfläche |
 | `config.json` | API-Endpunkte (optional, ohne Zugangsdaten) |
 | `.env` | Zugangsdaten `EUIPO_CLIENT_ID` / `EUIPO_CLIENT_SECRET` (lokal, nicht im Repo) |
